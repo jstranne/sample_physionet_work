@@ -79,11 +79,17 @@ def score_training_set():
 def evaluate_test_set():
     # Generate a data frame that points to the challenge files
     tr_files, te_files = phyc.get_files()
-
+    
+    print("TEST SET")
+    print("__________")
+    print(te_files)
+    
     for i in range(0, np.size(te_files, 0)):
         gc.collect()
         print('Evaluating test subject: %d/%d' % (i+1, np.size(te_files, 0)))
         record_name = te_files.header.values[i][:-4]
+        print("RECORD NAME")
+        print(record_name)
         output_file = os.path.basename(record_name) + '.vec'
         predictions = R.classify_record(record_name)
         np.savetxt(output_file, predictions, fmt='%.3f')

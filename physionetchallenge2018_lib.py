@@ -17,11 +17,11 @@ def get_files():
     header_loc, arousal_loc, signal_loc, is_training = [], [], [], []
     rootDir = '.'
     for dirName, subdirList, fileList in os.walk(rootDir, followlinks=True):
-        print(dirName)
-        print(os.sep)
-        if dirName != '.' and dirName != os.path.join(".","test") and dirName != os.path.join(".","training"):
+        #print(dirName)
+        #print(os.sep)
+        if dirName != '.' and dirName != os.path.join(".","test") and dirName != os.path.join(".","training") and "ipynb_checkpoints" not in dirName:
             if dirName.startswith(os.path.join(".","training","")):
-                print("found")
+                #print("FOUND")
                 is_training.append(True)
 
                 for fname in fileList:
@@ -45,6 +45,9 @@ def get_files():
     # combine into a data frame
 
     print("header loc",header_loc)
+    print("arouosal loc",arousal_loc)
+    print("signal loc",signal_loc)
+    print("training loc",is_training)
 
 
     data_locations = {'header':      header_loc,
@@ -109,6 +112,8 @@ def get_subject_data(arousal_file, signal_file, signal_names):
     return this_data
 
 def get_subject_data_test(signal_file, signal_names):
+    print("SIGNAL FILE:", signal_file, signal_names)
+    
     this_signal    = import_signals(signal_file)
     this_data      = this_signal
     this_data      = pd.DataFrame(this_data, index=None, columns=signal_names)
