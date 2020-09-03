@@ -3,3 +3,4 @@ training/
 .ipynb_checkpoints/
 __pycache__/
 entry.zip
+.idea/
