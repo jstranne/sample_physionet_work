@@ -42,33 +42,45 @@ class StagerNet(nn.Module):
         self.batchnorm2 = nn.BatchNorm2d(16)
     def forward(self, x):
         # Input should be C by T (2 by 3000)
+        x = torch.unsqueeze(x, 1)
         # change into C by T by 1 extending
-        print("Initial Size", x.size())
+        #print("Initial Size", x.size())
+        
         # convolve with C filters to 1 by T by C
         #linear activation ??
         x = self.conv1(x)
-        print("After spatial conv", x.size())
+        #print("After spatial conv", x.size())
+        
         #permute to C T I
         x = x.permute(0, 3, 2, 1)
-        print("after permutation", x.size())
+        #print("after permutation", x.size())
+        
         x = self.conv2(x)
-        print("After First Temporal Conv", x.size())
+        #print("After First Temporal Conv", x.size())
+        
         x = F.relu(F.max_pool2d(x, (13,1)))
-        print("Relu and maxpool", x.size())
+        #print("Relu and maxpool", x.size())
+        
         x = self.batchnorm1(x)
-        print("Batchnorm1", x.size())
+        #print("Batchnorm1", x.size())
+        
         x = self.conv3(x)
-        print("After Second Temporal Conv", x.size())
+        #print("After Second Temporal Conv", x.size())
+        
         x = F.relu(F.max_pool2d(x, (13, 1)))
-        print("Relu and maxpool", x.size())
+        #print("Relu and maxpool", x.size())
+        
         x = self.batchnorm2(x)
-        print("Batchnorm2", x.size())
+        #print("Batchnorm2", x.size())
+        
         x = torch.flatten(x,1) #flatten all but batch
-        print("Flattened", x.size())
+        #print("Flattened", x.size())
+        
         x = F.dropout(x, p=0.5)
         print("dropout", x.size())
+        
         x = self.dense1(x)
-        print("Dense", x.size())
+        #print("Dense", x.size())
         return x
 
 
@@ -109,7 +121,7 @@ if __name__=="__main__":
     #we really want 1 channel so we can get the right convolution
     x = torch.randn(2, 3000)
     print(x.size())
-    summary(model, (1, 3000, 2))
+    summary(model, (3000, 2))
     print("test")
 
     # loss_fn = torch.nn.MSELoss(reduction='sum')

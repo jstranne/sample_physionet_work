@@ -6,20 +6,23 @@ Jason Stranne
 import numpy as np
 import os
 import sys
-import physionetchallenge2018_lib as phyc
-from score2018 import Challenge2018Score
-from sklearn.metrics import precision_recall_curve, auc, roc_auc_score
-from zipfile import ZipFile, ZIP_DEFLATED
-import gc
+import scipy.io
+import gc as garbageCollector
+import mne
 
 
 def import_signals(file_name):
     return scipy.io.loadmat(file_name)['val']
 
+def loadSignals(recordName, dataPath):
+    signals = scipy.io.loadmat(dataPath + recordName + os.sep + recordName + '.mat')
+    signals = signals['val']
+    garbageCollector.collect()
+
+    return signals
 def extractWholeRecord(recordName,
-                       dataPath='PATH/',
-                       dataInDirectory=True):
-Keep all channels except ECG
+                       dataPath):
+    #Keep all channels except ECG
     # 0 - F3-M2
     # 1 - F4-M1
     # 2 - C3-M2
@@ -36,8 +39,8 @@ Keep all channels except ECG
     
     keepChannels = [0, 1]
 
-    signals = loadSignals(recordName, dataPath, dataInDirectory).astype(np.float64)
-    print(signals.shape)
+    signals = loadSignals(recordName, dataPath).astype(np.float64)
+    # print(signals.shape)
     # Want to add a 30Hz lowpass with hamming window
     signals = mne.filter.filter_data(data=signals, sfreq=200, l_freq=30, h_freq=None, method='fir', fir_window='hamming')
         
@@ -46,22 +49,34 @@ Keep all channels except ECG
 
     garbageCollector.collect()
 
-    return signals
+    return np.transpose(signals)
 
 
-def import_sleep_stages(file_name):
+def import_sleep_stages(dataPath, recordName):
+    
+    file_name = dataPath + recordName + os.sep + recordName + '-arousal.mat'
     import h5py
     import numpy
     f = h5py.File(file_name, 'r')
-    sleep_schedule = numpy.array(f['data']['sleep_stages']['undefined']) + /
-        numpy.array(f['data']['sleep_stages']['nonrem3']) + /
-        numpy.array(f['data']['sleep_stages']['nonrem2']) + /
-        numpy.array(f['data']['sleep_stages']['nonrem1']) + /
-        numpy.array(f['data']['sleep_stages']['rem']) + /
-        numpy.array(f['data']['sleep_stages']['wake']) + /
+    sleep_schedule = numpy.array(f['data']['sleep_stages']['undefined'])*0 + \
+        numpy.array(f['data']['sleep_stages']['nonrem3'])*1 + \
+        numpy.array(f['data']['sleep_stages']['nonrem2'])*2 + \
+        numpy.array(f['data']['sleep_stages']['nonrem1'])*3 + \
+        numpy.array(f['data']['sleep_stages']['rem'])*4 + \
+        numpy.array(f['data']['sleep_stages']['wake'])*5
     
-    ##
-    # Run some checks on this
-    ##
+    # downsample to 100Hz
+    sleep_schedule = sleep_schedule.flatten()[0::2]
     garbageCollector.collect()
     return sleep_schedule
+
+if __name__=="__main__":
+    root = os.path.join("..","training", "")
+    print(root)
+    x = extractWholeRecord(recordName = "tr03-0078", dataPath = root)
+    print(len(x[0]))
+    y=import_sleep_stages(recordName = "tr03-0078", dataPath = root)
+
+    print(len(y))
+    print(np.max(y))
+    print(np.min(y))
