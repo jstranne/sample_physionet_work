@@ -77,7 +77,7 @@ class StagerNet(nn.Module):
         #print("Flattened", x.size())
         
         x = F.dropout(x, p=0.5)
-        print("dropout", x.size())
+        #print("dropout", x.size())
         
         x = self.dense1(x)
         #print("Dense", x.size())
