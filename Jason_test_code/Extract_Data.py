@@ -10,7 +10,6 @@ import scipy.io
 import gc as garbageCollector
 import mne
 
-
 def import_signals(file_name):
     return scipy.io.loadmat(file_name)['val']
 
@@ -42,7 +41,8 @@ def extractWholeRecord(recordName,
     signals = loadSignals(recordName, dataPath).astype(np.float64)
     # print(signals.shape)
     # Want to add a 30Hz lowpass with hamming window
-    signals = mne.filter.filter_data(data=signals, sfreq=200, l_freq=30, h_freq=None, method='fir', fir_window='hamming')
+    
+    signals = mne.filter.filter_data(data=signals, sfreq=200, l_freq=None, h_freq=30, method='fir', fir_window='hamming')
         
     ## 200 -> 100Hz downsample
     signals = signals[keepChannels, 0::2]
@@ -52,18 +52,19 @@ def extractWholeRecord(recordName,
     return np.transpose(signals)
 
 
-def import_sleep_stages(dataPath, recordName):
-    
+def import_sleep_stages(recordName, dataPath):
+    # imports all the sleep stages as numbers in in array. A negative 1 corresponds to an undefined label.
     file_name = dataPath + recordName + os.sep + recordName + '-arousal.mat'
     import h5py
     import numpy
     f = h5py.File(file_name, 'r')
-    sleep_schedule = numpy.array(f['data']['sleep_stages']['undefined'])*0 + \
-        numpy.array(f['data']['sleep_stages']['nonrem3'])*1 + \
-        numpy.array(f['data']['sleep_stages']['nonrem2'])*2 + \
-        numpy.array(f['data']['sleep_stages']['nonrem1'])*3 + \
-        numpy.array(f['data']['sleep_stages']['rem'])*4 + \
-        numpy.array(f['data']['sleep_stages']['wake'])*5
+    #undefined are -1s
+    sleep_schedule = numpy.array(f['data']['sleep_stages']['undefined'])*-1 + \
+        numpy.array(f['data']['sleep_stages']['nonrem3'])*0 + \
+        numpy.array(f['data']['sleep_stages']['nonrem2'])*1 + \
+        numpy.array(f['data']['sleep_stages']['nonrem1'])*2 + \
+        numpy.array(f['data']['sleep_stages']['rem'])*3 + \
+        numpy.array(f['data']['sleep_stages']['wake'])*4
     
     # downsample to 100Hz
     sleep_schedule = sleep_schedule.flatten()[0::2]
