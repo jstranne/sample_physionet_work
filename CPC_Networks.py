@@ -4,38 +4,40 @@ import torch.nn.functional as F
 from torchsummary import summary
 from Stager_net_pratice import StagerNet
 
-class RelPosNet(nn.Module):
-    def __init__(self):
-        super(RelPosNet, self).__init__()
-        # self.conv1 = nn.Conv2d(1, 2, (2,1), stride=(1,1))
-
-        #we want 2 filters?
-        self.stagenet=StagerNet()
-        self.linear = nn.Linear(100,1)
+class GRUNet(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim, n_layers, drop_prob=0.2):
+        super(GRUNet, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.n_layers = n_layers
         
-    def forward(self, x1, x2):
-        x1 = self.stagenet(x1)
-        x2 = self.stagenet(x2)
-        #print('X1', x1.size())
-        #print('X2', x2.size())
+        self.gru = nn.GRU(input_dim, hidden_dim, n_layers, batch_first=True, dropout=drop_prob)
+        self.fc = nn.Linear(hidden_dim, output_dim)
+        self.relu = nn.ReLU()
         
-        #the torch.abs() is able to emulate the grp
-        x1 = self.linear(torch.abs(x1-x2))
-        return x1
+    def forward(self, x, h):
+        out, h = self.gru(x, h)
+        out = self.fc(self.relu(out[:,-1]))
+        return out, h
+    
+    def init_hidden(self, batch_size):
+        weight = next(self.parameters()).data
+        hidden = weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device)
+        return hidden
 
 
 if __name__=="__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # PyTorch v0.4.0
     model_stager = StagerNet().to(device)
-    model = RelPosNet().to(device)
+    model = TemporalShufflingNet().to(device)
     # print(model)
 
 
     x1 = torch.randn(2, 3000, 2)
     x2 = torch.randn(2, 3000, 2)
+    x3 = torch.randn(2, 3000, 2)
     y = torch.randn(2, 1)
-
-    x1, x2, y = x1.to(device), x2.to(device), y.to(device)
+    
+    x1, x2, x3, y = x1.to(device), x2.to(device), x3.to(device), y.to(device)
 
 
 
@@ -46,7 +48,7 @@ if __name__=="__main__":
     optimizer = torch.optim.Adam(model.parameters(), betas = beta_vals, lr=learning_rate, weight_decay=0.001)
     for t in range(20):
         # Forward pass: compute predicted y by passing x to the model.
-        y_pred = model(x1, x2)
+        y_pred = model(x1, x2, x3)
 
         # Compute and print loss.
         loss = loss_fn(y_pred, y)
@@ -61,6 +63,3 @@ if __name__=="__main__":
         # Calling the step function on an Optimizer makes an update to its
         # parameters
         optimizer.step()
-        
-        
-      

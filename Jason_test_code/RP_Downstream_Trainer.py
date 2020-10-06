@@ -109,12 +109,14 @@ params = {'batch_size': 256,
           'num_workers': 6}
 max_epochs = 150
 training_generator = torch.utils.data.DataLoader(training_set, **params)
+validation_generator = torch.utils.data.DataLoader(validation_set, **params)
 
 print("len of the dataloader is:",len(training_generator))
 
 #load trained StagerNet and make it so the embedder cant learn???
 trained_stage = StagerNet()
-trained_stage.load_state_dict(torch.load(".."+os.sep+"models"+os.sep+"RP_stagernet.pth"))
+#trained_stage.load_state_dict(torch.load(".."+os.sep+"models"+os.sep+"RP_stagernet.pth"))
+trained_stage.load_state_dict(torch.load(".."+os.sep+"models"+os.sep+"TS_stagernet.pth"))
 
 for p in trained_stage.parameters():
     p.requires_grad = False
@@ -171,13 +173,25 @@ for epoch in range(max_epochs):
         optimizer.step()
         
         running_loss+=loss.item()
-        
-        
+    
+    model.train=False
+    val_correct=0
+    val_total=0
+    for x, y in validation_generator:
+        x, y = x.to(device), y.to(device)
+        y_pred = model(x)
+        val_correct += num_correct(y_pred,y)
+        val_total += len(y)
+    model.train=True
+    
     # val_outputs = model()
-    print('[Epoch %d] loss: %.3f' %
+    print('[Epoch %d] Training loss: %.3f' %
                       (epoch + 1, running_loss/len(training_generator)))
-    print('[Epoch %d] accuracy: %.3f' %
-                      (epoch + 1, correct/total))
+    print('Training accuracy: %.3f' %
+                      (correct/total))
+    
+    print('Validation accuracy: %.3f' %
+                      (val_correct/val_total))
     
     
     

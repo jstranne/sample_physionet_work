@@ -59,7 +59,7 @@ class StagerNet(nn.Module):
         #print("After First Temporal Conv", x.size())
         
         x = F.relu(F.max_pool2d(x, (13,1)))
-        #print("Relu and maxpool", x.size())
+        # print("Relu and maxpool", x.size())
         
         x = self.batchnorm1(x)
         #print("Batchnorm1", x.size())
