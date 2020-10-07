@@ -123,7 +123,7 @@ training_generator = torch.utils.data.DataLoader(training_set, **params)
 print("len of the dataloader is:",len(training_generator))
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # PyTorch v0.4.0
-model = CPC_Net().to(device)
+model = CPC_Net(Np=16).to(device)
 
 print("Start Training")
 loss_fn = torch.nn.SoftMarginLoss(reduction='sum')
