@@ -14,6 +14,7 @@ sys.path.append(parentdir)
 from Temporal_Shuffling import TemporalShufflingNet
 from CPC_Network import CPC_Net
 import torch
+import torch.nn as nn
 from math import floor
 
 class Custom_CPC_Dataset(torch.utils.data.Dataset):
@@ -85,7 +86,13 @@ class Custom_CPC_Dataset(torch.utils.data.Dataset):
             raise Exception("never found an Nb, need to debug")
         # cant be in the range (start+Nc+Np)
         return self.data[num, :, :]
-           
+          
+def customLoss(input_data):
+    #input data should be in the shape [batch, np, nb+1]
+    # the first index of the nb+1 is the correct one
+    lsoft = nn.LogSoftmax(dim=2)
+    soft = lsoft(input_data)[:, :, 0]
+    return -torch.sum(soft)
         
 def num_correct(ypred, ytrue):
     return ((ypred* ytrue) > 0).float().sum().item()
@@ -133,6 +140,8 @@ optimizer = torch.optim.Adam(model.parameters(), betas = beta_vals, lr=learning_
 
 
 
+
+
 Xc, Xp, Xb = next(iter(training_generator))
 print("XC", Xc.shape)
 print("XP", Xp.shape)
@@ -140,6 +149,7 @@ print("XB", Xb.shape)
 Xc, Xp, Xb = Xc.to(device), Xp.to(device), Xb.to(device)
 
 y_pred = model(Xc, Xp, Xb)
+print(customLoss(y_pred))
 
 # t_neg=0
 # # t_pos=0
