@@ -6,25 +6,31 @@ from Stager_net_pratice import StagerNet
 import numpy as np
 
 class CPC_Net(nn.Module):
-    def __init__(self,):
+    def __init__(self, Np):
         super(CPC_Net, self).__init__()
         self.stagenet = StagerNet()
-        Np=10
         h_dim=100
         ct_dim=100
-        self.gru = nn.GRU(ct_dim, h_dim, 1)
-        self.NpList = []
+        self.gru = nn.GRU(ct_dim, h_dim, 1, batch_first=True)
+        self.BilinearList = nn.ModuleList()
         for i in range(Np):
-            self.NpList.append(nn.Bilinear(in1_features=h_dim, in2_features=ct_dim, out_features=1, bias=False))
+            self.BilinearList.append(nn.Bilinear(in1_features=h_dim, in2_features=ct_dim, out_features=1, bias=False))
         
+        
+        self.sample_bilin = nn.Bilinear(in1_features=h_dim, in2_features=ct_dim, out_features=1, bias=False)
 
         self.logsoftmax = nn.LogSoftmax()
 
 
     def forward(self, Xc, Xp, Xb_array):
         
-        # we want to construct the array to call the loss on
-        #Xc = self.stagenet(Xc)
+        Xb_new = [[self.stagenet(torch.squeeze(Xb_array[:, i, j, :, :])) for i in range(list(Xb_array.shape)[1])] for j in range(list(Xb_array.shape)[2])]        
+        for i in range(len(Xb_new)):
+            Xb_new[i] = torch.stack(Xb_new[i])
+#         Xb_new = [torch.stack(Xb_new[i]) for i in range(len(Xb_new))]
+        Xb_new = torch.stack(Xb_new)
+        Xb_new = Xb_new.permute(2, 1, 0, 3) 
+        
         
         
         Xc_new = [self.stagenet(torch.squeeze(Xc[:, x, :, :])) for x in range(list(Xc.shape)[1])]
@@ -34,16 +40,27 @@ class CPC_Net(nn.Module):
         Xp_new = [self.stagenet(torch.squeeze(Xp[:, x, :, :])) for x in range(list(Xp.shape)[1])]
         Xp_new = torch.stack(Xp_new)
         Xp_new = Xp_new.permute(1, 0, 2) 
-        print(Xp_new.shape)
         
         
-        ct = self.gru(Xc)
+        output, hn = self.gru(Xc_new)
+        hn=torch.squeeze(hn)
+        Xp_new = Xp_new.unsqueeze(2)
         
-        # all 100 dim
         
-
+        Xp_new = torch.cat((Xp_new, Xb_new), 2)
         
-        return x1
+        
+        output_cat = torch.empty([32, 16, 11], dtype=Xp_new.dtype, device=Xp_new.device)
+        
+        for batch in range(list(Xp_new.shape)[0]):
+            for predicted in range(list(Xp_new.shape)[1]):
+                #bilinear = self.BilinearList[predicted]
+                for sample in range(list(Xp_new.shape)[2]):
+                    
+                    output_cat[batch, predicted, sample] = self.BilinearList[predicted](hn[batch, :], Xp_new[batch, predicted, sample, :])
+        # print(output_cat.shape)
+        
+        return output_cat
 
 
 if __name__=="__main__":

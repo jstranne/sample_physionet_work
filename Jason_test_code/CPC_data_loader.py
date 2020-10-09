@@ -16,6 +16,8 @@ from CPC_Network import CPC_Net
 import torch
 import torch.nn as nn
 from math import floor
+from tqdm import tqdm
+
 
 class Custom_CPC_Dataset(torch.utils.data.Dataset):
     # 'Characterizes a dataset for PyTorch'
@@ -94,8 +96,10 @@ def customLoss(input_data):
     soft = lsoft(input_data)[:, :, 0]
     return -torch.sum(soft)
         
-def num_correct(ypred, ytrue):
-    return ((ypred* ytrue) > 0).float().sum().item()
+def num_correct(ypred):
+    argmx = torch.argmax(ypred, dim=2)
+    correct = (torch.sum(argmx==0)).float().sum().item()
+    return correct, argmx.nelement()
 
     
 root = os.path.join("..","training", "")
@@ -124,7 +128,7 @@ print("one dataset is", len(datasets_list[0]))
 params = {'batch_size': 32,
           'shuffle': True,
           'num_workers': 6}
-max_epochs = 150
+max_epochs = 20
 training_generator = torch.utils.data.DataLoader(training_set, **params)
 
 print("len of the dataloader is:",len(training_generator))
@@ -142,51 +146,51 @@ optimizer = torch.optim.Adam(model.parameters(), betas = beta_vals, lr=learning_
 
 
 
-Xc, Xp, Xb = next(iter(training_generator))
-print("XC", Xc.shape)
-print("XP", Xp.shape)
-print("XB", Xb.shape)
-Xc, Xp, Xb = Xc.to(device), Xp.to(device), Xb.to(device)
+# Xc, Xp, Xb = next(iter(training_generator))
+# print("XC", Xc.shape)
+# print("XP", Xp.shape)
+# print("XB", Xb.shape)
+# Xc, Xp, Xb = Xc.to(device), Xp.to(device), Xb.to(device)
 
-y_pred = model(Xc, Xp, Xb)
-print(customLoss(y_pred))
+# y_pred = model(Xc, Xp, Xb)
+# print(customLoss(y_pred))
 
-# t_neg=0
-# # t_pos=0
-# for epoch in range(max_epochs):
-#     running_loss=0
-#     correct=0
-#     total=0
-#     for X1,X2,X3, y in training_generator:
-#         #print(X1.shape)
-#         #print(y.shape)
-#         # Transfer to GPU
-#         X1, X2, X3, y = X1.to(device), X2.to(device), X3.to(device), y.to(device)
-#         #print(X1.shape)
-#         y_pred = model(X1, X2, X3)
-#         loss = loss_fn(y_pred, y)
-        
-#         #calculate accuracy
-#         correct += num_correct(y_pred,y)
-#         total += len(y)
-        
-#         #print("batch:", loss.item())
-        
-#         #zero gradients
-#         optimizer.zero_grad()
-#         # Backward pass: compute gradient of the loss with respect to model
-#         # parameters
-#         loss.backward()
 
-#         # Calling the step function on an Optimizer makes an update to its
-#         # parameters
-#         optimizer.step()
+for epoch in range(max_epochs):
+    running_loss=0
+    correct=0
+    total=0
+    for Xc, Xp, Xb in tqdm(training_generator):
+        #print(X1.shape)
+        #print(y.shape)
+        # Transfer to GPU
+        Xc, Xp, Xb= Xc.to(device), Xp.to(device), Xb.to(device)
+        #print(X1.shape)
+        y_pred = model(Xc, Xp, Xb)
+        loss = customLoss(y_pred)
         
-#         running_loss+=loss.item()
-#     print('[Epoch %d] loss: %.3f' %
-#                       (epoch + 1, running_loss/len(training_generator)))
-#     print('[Epoch %d] accuracy: %.3f' %
-#                       (epoch + 1, correct/total))
+        #calculate accuracy
+        new_correct, new_total = num_correct(y_pred)
+        correct += new_correct
+        total += new_total
+        
+        #print("batch:", loss.item())
+        
+        #zero gradients
+        optimizer.zero_grad()
+        # Backward pass: compute gradient of the loss with respect to model
+        # parameters
+        loss.backward()
+
+        # Calling the step function on an Optimizer makes an update to its
+        # parameters
+        optimizer.step()
+        
+        running_loss+=loss.item()
+    print('[Epoch %d] loss: %.3f' %
+                      (epoch + 1, running_loss/len(training_generator)))
+    print('[Epoch %d] accuracy: %.3f' %
+                      (epoch + 1, correct/total))
     
     
     
