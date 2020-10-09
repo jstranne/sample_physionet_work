@@ -60,8 +60,8 @@ def preprocess_file(recordName):
     for i in range(total_windows):
         xval = x[sampling_rate*window_size*i:sampling_rate*window_size*(i+1)]
         yval = y[sampling_rate*window_size*i:sampling_rate*window_size*(i+1)]
-        #print('x shape', xval.shape)
-        #print('y shape', xval.shape)
+
+        
         mode, mode_count = stats.mode(yval)
         if mode_count != sampling_rate*window_size or len(mode)>1:
             #there are conflicting signals, skip

@@ -14,6 +14,8 @@ from Stager_net_pratice import StagerNet
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import random
+import itertools
 
 
 class DownstreamNet(nn.Module):
@@ -43,8 +45,6 @@ class Downstream_Dataset(torch.utils.data.Dataset):
         print("data shape", self.data.shape)
         print("removed", len(unknown[0]), "unknown entries")
         
-        
-        
     def __len__(self):
         'Denotes the total number of samples'
         return len(self.labels)
@@ -58,150 +58,192 @@ class Downstream_Dataset(torch.utils.data.Dataset):
 
     
 def print_class_counts(y_pred):
-        zero = (torch.argmax(y_pred, dim=1)==0).float().sum()
-        print("zero", zero)
-        one = (torch.argmax(y_pred, dim=1)==1).float().sum()
-        print("one", one)
-        two = (torch.argmax(y_pred, dim=1)==2).float().sum()
-        print("two", two)
-        three = (torch.argmax(y_pred, dim=1)==3).float().sum()
-        print("three", three)
-        four = (torch.argmax(y_pred, dim=1)==4).float().sum()
-        print("four", four)
-    
+#         zero = (torch.argmax(y_pred, dim=1)==0).float().sum()
+#         print("zero", zero)
+#         one = (torch.argmax(y_pred, dim=1)==1).float().sum()
+#         print("one", one)
+#         two = (torch.argmax(y_pred, dim=1)==2).float().sum()
+#         print("two", two)
+#         three = (torch.argmax(y_pred, dim=1)==3).float().sum()
+#         print("three", three)
+#         four = (torch.argmax(y_pred, dim=1)==4).float().sum()
+#         print("four", four)
+    n1 = (torch.argmax(y_pred, dim=1)==-1).float().sum()
+    if n1.item() > 0:
+        print("There are", n1.item(), "Unknown labels that showed up")
 
 def num_correct(ypred, ytrue):
     #print(ypred)
     #print(torch.argmax(ypred, dim=1))
     #torch.argmax(a, dim=1)
     return (torch.argmax(ypred, dim=1)==ytrue).float().sum().item()
+
+def reduce_dataset_size(dataset, num_of_each):
+    print(dataset.shape)
+    a = dataset[:, 0]
+    print(a)
+
+
+def smallest_class_len(training_set):
+    indecies=[[],[],[],[],[]]
+
+    for i in range(len(training_set)):
+            # puts in in the list based on the label
+            indecies[training_set[i][1].item()].append(i)
+
+    smallest_class = len(indecies[0])
+    for num in range(len(indecies)):
+        smallest_class=min(smallest_class, len(indecies[num]))
+    return smallest_class
+
+
+def restrict_training_size_per_class(training_set, samples_per_class):
+    indecies=[[],[],[],[],[]]
+
+    for i in range(len(training_set)):
+            # puts in in the list based on the label
+            indecies[training_set[i][1].item()].append(i)
+
+    smallest_class = 0
+    for num in range(len(indecies)):
+        smallest_class=min(smallest_class, len(indecies[num]))
+        random.shuffle(indecies[num])
+
+    for num in range(len(indecies)):
+        smallest_class=min(smallest_class, len(indecies[num]))
+        random.shuffle(indecies[num])
+
+    for num in range(len(indecies)):
+        indecies[num]=indecies[num][:samples_per_class]
+
+    flat=itertools.chain.from_iterable(indecies)
+    to_use = list(flat)
+    random.shuffle(to_use)
+
+    return torch.utils.data.Subset(training_set, to_use)
+
+
+
+def train_end_to_end(stagernet_path, train_set, val_set, pos_labels_per_class, max_epochs, verbose=False):
     
-    
-root = os.path.join("..","training", "")
 
-datasets_list=[]
-print('Loading Data')
-f=open(os.path.join("..","training_names.txt"),'r')
-lines = f.readlines()
-for line in lines:
-    recordName=line.strip()
-    print('Processing', recordName)
-    data_file=root+recordName+os.sep+recordName
-    datasets_list.append(Downstream_Dataset(path=data_file))
-f.close()
-
-
-dataset = torch.utils.data.ConcatDataset(datasets_list)
-data_len = len(dataset)
-print("dataset len is", len(dataset))
-
-train_len = int(data_len*0.6)
-val_len = data_len - train_len
-training_set, validation_set = torch.utils.data.random_split(dataset, [train_len, val_len])
-
-print(validation_set)
-
-
-print("one dataset is", len(datasets_list[0]))
-
-params = {'batch_size': 256,
-          'shuffle': True,
-          'num_workers': 6}
-max_epochs = 150
-training_generator = torch.utils.data.DataLoader(training_set, **params)
-validation_generator = torch.utils.data.DataLoader(validation_set, **params)
-
-print("len of the dataloader is:",len(training_generator))
-
-#load trained StagerNet and make it so the embedder cant learn???
-trained_stage = StagerNet()
-#trained_stage.load_state_dict(torch.load(".."+os.sep+"models"+os.sep+"RP_stagernet.pth"))
-trained_stage.load_state_dict(torch.load(".."+os.sep+"models"+os.sep+"TS_stagernet.pth"))
-
-for p in trained_stage.parameters():
-    p.requires_grad = False
-    #print(p)
-    
-# cuda setup if allowed
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # PyTorch v0.4.0
-model = DownstreamNet(trained_stage).to(device)
-                         
-
-#defining training parameters
-loss_fn = nn.CrossEntropyLoss()
-learning_rate = 5e-4
-beta_vals = (0.9, 0.999)
-optimizer = torch.optim.Adam(model.parameters(), betas = beta_vals, lr=learning_rate, weight_decay=0.001)
-
-
-
-
-
-print("Start Training")
-
-
-
-for epoch in range(max_epochs):
-    running_loss=0
-    correct=0
-    total=0
-    for x, y in training_generator:
-        #print(X1.shape)
-        #print(y.shape)
-        # Transfer to GPU
-        x, y = x.to(device), y.to(device)
-        y_pred = model(x)
-        loss = loss_fn(y_pred, y)
-        #print("batch:", loss.item())
         
-        #accuracy
-        correct += num_correct(y_pred,y)
-        total += len(y)
-        
-        
-        # print_class_counts(y_pred)
-        
-        
-        #zero gradients
-        optimizer.zero_grad()
-        # Backward pass: compute gradient of the loss with respect to model
-        # parameters
-        loss.backward()
+    train_set_reduced = restrict_training_size_per_class(train_set, pos_labels_per_class)
 
-        # Calling the step function on an Optimizer makes an update to its
-        # parameters
-        optimizer.step()
+    params = {'batch_size': 256,
+              'shuffle': True,
+              'num_workers': 6}
+    training_generator = torch.utils.data.DataLoader(train_set_reduced, **params)
+    validation_generator = torch.utils.data.DataLoader(val_set, **params)
+
+    print("len of the dataloader is:",len(training_generator))
+    
+    
+    if stagernet_path == "full_supervision":
+        trained_stage = StagerNet()
+    else:    
+        trained_stage = StagerNet()
+        if stagernet_path:
+            trained_stage.load_state_dict(torch.load(".."+os.sep+"models"+os.sep+stagernet_path))
+
+        for p in trained_stage.parameters():
+            p.requires_grad = False
+            #print(p)
+
+    # cuda setup if allowed
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # PyTorch v0.4.0
+    model = DownstreamNet(trained_stage).to(device)
+
+    #defining training parameters
+    loss_fn = nn.CrossEntropyLoss()
+    learning_rate = 5e-4
+    beta_vals = (0.9, 0.999)
+    optimizer = torch.optim.Adam(model.parameters(), betas = beta_vals, lr=learning_rate, weight_decay=0.001)
+
+
+    print("Start Training")
+
+    for epoch in range(max_epochs):
+        running_loss=0
+        correct=0
+        total=0
+        for x, y in training_generator:
+            #print(X1.shape)
+            #print(y.shape)
+            # Transfer to GPU
+            x, y = x.to(device), y.to(device)
+            y_pred = model(x)
+            loss = loss_fn(y_pred, y)
+            #print("batch:", loss.item())
+
+            #accuracy
+            correct += num_correct(y_pred,y)
+            total += len(y)
+
+
+            print_class_counts(y_pred)
+
+
+            #zero gradients
+            optimizer.zero_grad()
+            # Backward pass: compute gradient of the loss with respect to model
+            # parameters
+            loss.backward()
+
+            # Calling the step function on an Optimizer makes an update to its
+            # parameters
+            optimizer.step()
+
+            running_loss+=loss.item()
+
+        model.train=False
+        val_correct=0
+        val_total=0
+        for x, y in validation_generator:
+            x, y = x.to(device), y.to(device)
+            y_pred = model(x)
+            val_correct += num_correct(y_pred,y)
+            val_total += len(y)
+        model.train=True
+
+        # val_outputs = model()
+        if verbose:
+            print('[Epoch %d] Training loss: %.3f' %
+                              (epoch + 1, running_loss/len(training_generator)))
+            print('Training accuracy: %.3f' %
+                              (correct/total))
+
+            print('Validation accuracy: %.3f' %
+                              (val_correct/val_total))
         
-        running_loss+=loss.item()
-    
-    model.train=False
-    val_correct=0
-    val_total=0
-    for x, y in validation_generator:
-        x, y = x.to(device), y.to(device)
-        y_pred = model(x)
-        val_correct += num_correct(y_pred,y)
-        val_total += len(y)
-    model.train=True
-    
-    # val_outputs = model()
-    print('[Epoch %d] Training loss: %.3f' %
-                      (epoch + 1, running_loss/len(training_generator)))
-    print('Training accuracy: %.3f' %
-                      (correct/total))
-    
-    print('Validation accuracy: %.3f' %
-                      (val_correct/val_total))
-    
-    
-    
+    return val_correct/val_total
 
-# print(model.stagenet)
-# stagenet_save_path = os.path.join("..", "models", "RP_stagernet.pth")
-# torch.save(model.stagenet.state_dict(), stagenet_save_path)
 
-def num_correct(ypred, ytrue):
-    count = 0
-    truth = (np.multiply(ypred, ytrue) > 0).float().sum()
-    print(truth)
-    return truth
+
+if __name__=="__main__":
+    root = os.path.join("..","training", "")
+
+    datasets_list=[]
+    print('Loading Data')
+    f=open(os.path.join("..","training_names.txt"),'r')
+    lines = f.readlines()
+    for line in lines:
+        recordName=line.strip()
+        print('Processing', recordName)
+        data_file=root+recordName+os.sep+recordName
+        datasets_list.append(Downstream_Dataset(path=data_file))
+        d = Downstream_Dataset(path=data_file)
+        print(d.labels.shape)
+    f.close()
+
+
+    dataset = torch.utils.data.ConcatDataset(datasets_list)
+    data_len = len(dataset)
+    print("dataset len is", len(dataset))
+
+    train_len = int(data_len*0.6)
+    val_len = data_len - train_len
+     
+    training_set, validation_set = torch.utils.data.random_split(dataset, [train_len, val_len])
+        
+    train_end_to_end("RP_stagernet.pth", training_set, validation_set, 1000, 150)

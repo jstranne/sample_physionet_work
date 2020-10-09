@@ -128,7 +128,7 @@ print("one dataset is", len(datasets_list[0]))
 params = {'batch_size': 32,
           'shuffle': True,
           'num_workers': 6}
-max_epochs = 20
+max_epochs = 30
 training_generator = torch.utils.data.DataLoader(training_set, **params)
 
 print("len of the dataloader is:",len(training_generator))
@@ -195,6 +195,6 @@ for epoch in range(max_epochs):
     
     
 
-# print(model.stagenet)
-# stagenet_save_path = os.path.join("..", "models", "TS_stagernet.pth")
-# torch.save(model.stagenet.state_dict(), stagenet_save_path)
+print(model.stagenet)
+stagenet_save_path = os.path.join("..", "models", "CPC_stagernet.pth")
+torch.save(model.stagenet.state_dict(), stagenet_save_path)
