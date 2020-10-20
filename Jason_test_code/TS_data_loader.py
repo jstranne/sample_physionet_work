@@ -144,7 +144,7 @@ print("one dataset is", len(datasets_list[0]))
 params = {'batch_size': 256,
           'shuffle': True,
           'num_workers': 6}
-max_epochs = 150
+max_epochs = 100
 training_generator = torch.utils.data.DataLoader(training_set, **params)
 
 print("len of the dataloader is:",len(training_generator))

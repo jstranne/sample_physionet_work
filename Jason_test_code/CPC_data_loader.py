@@ -125,10 +125,10 @@ training_set = torch.utils.data.ConcatDataset(datasets_list)
 
 print("one dataset is", len(datasets_list[0]))
 
-params = {'batch_size': 32,
+params = {'batch_size': 16,
           'shuffle': True,
-          'num_workers': 6}
-max_epochs = 30
+          'num_workers': 12}
+max_epochs = 25
 training_generator = torch.utils.data.DataLoader(training_set, **params)
 
 print("len of the dataloader is:",len(training_generator))
@@ -161,6 +161,7 @@ for epoch in range(max_epochs):
     correct=0
     total=0
     for Xc, Xp, Xb in tqdm(training_generator):
+        gc.collect()
         #print(X1.shape)
         #print(y.shape)
         # Transfer to GPU

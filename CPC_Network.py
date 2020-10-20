@@ -4,6 +4,8 @@ import torch.nn.functional as F
 from torchsummary import summary
 from Stager_net_pratice import StagerNet
 import numpy as np
+import gc
+
 
 class CPC_Net(nn.Module):
     def __init__(self, Np):
@@ -24,33 +26,42 @@ class CPC_Net(nn.Module):
 
     def forward(self, Xc, Xp, Xb_array):
         
-        Xb_new = [[self.stagenet(torch.squeeze(Xb_array[:, i, j, :, :])) for i in range(list(Xb_array.shape)[1])] for j in range(list(Xb_array.shape)[2])]        
-        for i in range(len(Xb_new)):
-            Xb_new[i] = torch.stack(Xb_new[i])
-#         Xb_new = [torch.stack(Xb_new[i]) for i in range(len(Xb_new))]
-        Xb_new = torch.stack(Xb_new)
-        Xb_new = Xb_new.permute(2, 1, 0, 3) 
+        gc.collect()
+        
+        #print(Xb_array.shape)
+        #a = torch.empty([32, 16, 10, 100], dtype=Xp.dtype, device=Xp.device)
+#         for batch in range(list(Xb_array.shape)[0]):
+#             for i in range(list(Xb_array.shape)[1]):
+#                 for j in range(list(Xb_array.shape)[2]):
+#                     gc.collect()
+#                     a[:, i, j, :] = self.stagenet(torch.squeeze(Xb_array[:, i, j, :, :]))
+        
+        Xb_array = [[self.stagenet(torch.squeeze(Xb_array[:, i, j, :, :])) for i in range(list(Xb_array.shape)[1])] for j in range(list(Xb_array.shape)[2])]         
+        for i in range(len(Xb_array)):
+            Xb_array[i] = torch.stack(Xb_array[i])
+#         Xb_array = [torch.stack(Xb_array[i]) for i in range(len(Xb_array))]
+        Xb_array = torch.stack(Xb_array)
+        Xb_array = Xb_array.permute(2, 1, 0, 3) 
         
         
-        
-        Xc_new = [self.stagenet(torch.squeeze(Xc[:, x, :, :])) for x in range(list(Xc.shape)[1])]
-        Xc_new = torch.stack(Xc_new)
-        Xc_new = Xc_new.permute(1, 0, 2) 
+        Xc = [self.stagenet(torch.squeeze(Xc[:, x, :, :])) for x in range(list(Xc.shape)[1])]
+        Xc = torch.stack(Xc)
+        Xc = Xc.permute(1, 0, 2) 
         
         Xp_new = [self.stagenet(torch.squeeze(Xp[:, x, :, :])) for x in range(list(Xp.shape)[1])]
         Xp_new = torch.stack(Xp_new)
         Xp_new = Xp_new.permute(1, 0, 2) 
         
         
-        output, hn = self.gru(Xc_new)
+        output, hn = self.gru(Xc)
         hn=torch.squeeze(hn)
         Xp_new = Xp_new.unsqueeze(2)
         
         
-        Xp_new = torch.cat((Xp_new, Xb_new), 2)
+        Xp_new = torch.cat((Xp_new, Xb_array), 2)
         
         
-        output_cat = torch.empty([32, 16, 11], dtype=Xp_new.dtype, device=Xp_new.device)
+        output_cat = torch.empty([list(Xb_array.shape)[0], 16, 11], dtype=Xp_new.dtype, device=Xp_new.device)
         
         for batch in range(list(Xp_new.shape)[0]):
             for predicted in range(list(Xp_new.shape)[1]):
@@ -76,7 +87,7 @@ if __name__=="__main__":
     y = torch.randn(2, 1)
     
     x1, x2, x3, y = x1.to(device), x2.to(device), x3.to(device), y.to(device)
-
+    
 
 
     print("Start Training")

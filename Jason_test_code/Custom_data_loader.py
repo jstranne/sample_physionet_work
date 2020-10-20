@@ -121,93 +121,92 @@ class Custom_RP_Dataset(torch.utils.data.Dataset):
 def num_correct(ypred, ytrue):
     return ((ypred* ytrue) > 0).float().sum().item()
 
-    
-root = os.path.join("..","training", "")
-recordName="tr03-0078"
-data_file=root+recordName+os.sep+recordName
+if __name__=="__main__":
 
-datasets_list=[]
-print('Loading Data')
-f=open(os.path.join("..","training_names.txt"),'r')
-lines = f.readlines()
-for line in lines:
-    recordName=line.strip()
-    print('Processing', recordName)
-    data_file=root+recordName+os.sep+recordName
-    datasets_list.append(Custom_RP_Dataset(path=data_file, total_points=2000, tpos=120, tneg=300, windowSize=30, sfreq=100))
-f.close()
+    root = os.path.join("..","training", "")
 
+    datasets_list=[]
+    print('Loading Data')
+    f=open(os.path.join("..","training_names.txt"),'r')
+    lines = f.readlines()
+    for line in lines:
+        recordName=line.strip()
+        print('Processing', recordName)
+        data_file=root+recordName+os.sep+recordName
+        datasets_list.append(Custom_RP_Dataset(path=data_file, total_points=2000, tpos=120, tneg=300, windowSize=30, sfreq=100))
+    f.close()
 
 
-# recordName="tr03-0078"
-# data_file=root+recordName+os.sep+recordName
-# training_set=Custom_RP_Dataset(path=data_file, total_points=2000, tpos=120, tneg=300, windowSize=30, sfreq=100)
 
-training_set = torch.utils.data.ConcatDataset(datasets_list)
+    # recordName="tr03-0078"
+    # data_file=root+recordName+os.sep+recordName
+    # training_set=Custom_RP_Dataset(path=data_file, total_points=2000, tpos=120, tneg=300, windowSize=30, sfreq=100)
 
-print("one dataset is", len(datasets_list[0]))
+    training_set = torch.utils.data.ConcatDataset(datasets_list)
 
-params = {'batch_size': 256,
-          'shuffle': True,
-          'num_workers': 6}
-max_epochs = 150
-training_generator = torch.utils.data.DataLoader(training_set, **params)
+    print("one dataset is", len(datasets_list[0]))
 
-print("len of the dataloader is:",len(training_generator))
+    params = {'batch_size': 256,
+              'shuffle': True,
+              'num_workers': 6}
+    max_epochs = 100
+    training_generator = torch.utils.data.DataLoader(training_set, **params)
 
-# cuda setup if allowed
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # PyTorch v0.4.0
-model = RelPosNet().to(device)
+    print("len of the dataloader is:",len(training_generator))
 
-#defining training parameters
-print("Start Training")
-loss_fn = torch.nn.SoftMarginLoss(reduction='sum')
-learning_rate = 5e-4
-beta_vals = (0.9, 0.999)
-optimizer = torch.optim.Adam(model.parameters(), betas = beta_vals, lr=learning_rate, weight_decay=0.001)
+    # cuda setup if allowed
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # PyTorch v0.4.0
+    model = RelPosNet().to(device)
 
-# t_neg=0
-# t_pos=0
-for epoch in range(max_epochs):
-    running_loss=0
-    correct=0
-    total=0
-    for X1,X2, y in training_generator:
-        #print(X1.shape)
-        #print(y.shape)
-        # Transfer to GPU
-        X1, X2, y = X1.to(device), X2.to(device), y.to(device)
-        #print(X1.shape)
-        y_pred = model(X1, X2)
-        loss = loss_fn(y_pred, y)
-        
-        #calculate accuracy
-        correct += num_correct(y_pred,y)
-        total += len(y)
-        
-        #print("batch:", loss.item())
-        
-        #zero gradients
-        optimizer.zero_grad()
-        # Backward pass: compute gradient of the loss with respect to model
-        # parameters
-        loss.backward()
+    #defining training parameters
+    print("Start Training")
+    loss_fn = torch.nn.SoftMarginLoss(reduction='sum')
+    learning_rate = 5e-4
+    beta_vals = (0.9, 0.999)
+    optimizer = torch.optim.Adam(model.parameters(), betas = beta_vals, lr=learning_rate, weight_decay=0.001)
 
-        # Calling the step function on an Optimizer makes an update to its
-        # parameters
-        optimizer.step()
-        
-        running_loss+=loss.item()
-    print('[Epoch %d] loss: %.3f' %
-                      (epoch + 1, running_loss/len(training_generator)))
-    print('[Epoch %d] accuracy: %.3f' %
-                      (epoch + 1, correct/total))
-    
-    
-    
+    # t_neg=0
+    # t_pos=0
+    for epoch in range(max_epochs):
+        running_loss=0
+        correct=0
+        total=0
+        for X1,X2, y in training_generator:
+            #print(X1.shape)
+            #print(y.shape)
+            # Transfer to GPU
+            X1, X2, y = X1.to(device), X2.to(device), y.to(device)
+            #print(X1.shape)
+            y_pred = model(X1, X2)
+            loss = loss_fn(y_pred, y)
 
-print(model.stagenet)
-stagenet_save_path = os.path.join("..", "models", "RP_stagernet.pth")
-torch.save(model.stagenet.state_dict(), stagenet_save_path)
+            #calculate accuracy
+            correct += num_correct(y_pred,y)
+            total += len(y)
+
+            #print("batch:", loss.item())
+
+            #zero gradients
+            optimizer.zero_grad()
+            # Backward pass: compute gradient of the loss with respect to model
+            # parameters
+            loss.backward()
+
+            # Calling the step function on an Optimizer makes an update to its
+            # parameters
+            optimizer.step()
+
+            running_loss+=loss.item()
+        print('[Epoch %d] loss: %.3f' %
+                          (epoch + 1, running_loss/len(training_generator)))
+        print('[Epoch %d] accuracy: %.3f' %
+                          (epoch + 1, correct/total))
+
+
+
+
+    print(model.stagenet)
+    stagenet_save_path = os.path.join("..", "models", "RP_stagernet.pth")
+    torch.save(model.stagenet.state_dict(), stagenet_save_path)
 
 
